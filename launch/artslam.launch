@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- arguments -->
+  <arg name="nodelet_manager" default="velodyne_nodelet_manager" />
+  <arg name="points_topic" default="/filtered_points" />
+
+  <!-- transformation between lidar and base_link -->
+  <node pkg="tf" type="static_transform_publisher" name="lidar2base_publisher" args="0 0 0 0 0 0 base_link velodyne 1000" />
+
+  <!-- in case you use velodyne_driver, comment out the following line -->
+  <node pkg="nodelet" type="nodelet" name="$(arg nodelet_manager)" args="manager" output="screen"/>
+
+  <!-- prefiltering_nodelet -->
+   <node pkg="nodelet" type="nodelet" name="artslam_laser_3d_nodelet" args="load artslam_laser_3d_wrapper/ArtslamLaserWrapper $(arg nodelet_manager)">
+     <remap from="/velodyne_points" to="$(arg points_topic)" />
+     <param name="configuration_file" value="/home/matteo/catkin_ws/src/artslam_laser_3d/configs/KITTI_long.json"/>
+     <param name="results_path" value="/home/matteo/results/"/>
+   </node>
+</launch>

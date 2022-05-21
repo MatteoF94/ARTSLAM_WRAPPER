@@ -1,0 +1,6 @@
+<library path="lib/libartslam_laser_3d_nodelet">
+    <class name="artslam_laser_3d_wrapper/ArtslamLaserWrapper" type="artslam::laser3d::ArtslamLaserWrapper" base_class_type="nodelet::Nodelet" />
+    <description>
+        A node to add a value and republish.
+    </description>
+</library>
