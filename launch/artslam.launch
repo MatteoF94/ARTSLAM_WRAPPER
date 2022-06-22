@@ -2,10 +2,14 @@
 <launch>
   <!-- arguments -->
   <arg name="nodelet_manager" default="velodyne_nodelet_manager" />
-  <arg name="points_topic" default="/filtered_points" />
+  <arg name="points_topic" default="points_raw" />
+  <arg name="imu_topic" default="imu_correct" />
 
   <!-- transformation between lidar and base_link -->
+  <node pkg="tf" type="static_transform_publisher" name="odom2map_publisher" args="0 0 0 0 0 0 map odom 1000" />
+  <node pkg="tf" type="static_transform_publisher" name="base2odom_publisher" args="0 0 0 0 0 0 odom base_link 1000" />
   <node pkg="tf" type="static_transform_publisher" name="lidar2base_publisher" args="0 0 0 0 0 0 base_link velodyne 1000" />
+  <node pkg="tf" type="static_transform_publisher" name="imu2base_publisher" args="-8.086759e-01 3.195559e-01 -7.997231e-01 -0.0007854 -0.0020244 0.0148251 base_link imu_enu_link 1000" />
 
   <!-- in case you use velodyne_driver, comment out the following line -->
   <node pkg="nodelet" type="nodelet" name="$(arg nodelet_manager)" args="manager" output="screen"/>
@@ -13,7 +17,10 @@
   <!-- prefiltering_nodelet -->
    <node pkg="nodelet" type="nodelet" name="artslam_laser_3d_nodelet" args="load artslam_laser_3d_wrapper/ArtslamLaserWrapper $(arg nodelet_manager)">
      <remap from="/velodyne_points" to="$(arg points_topic)" />
-     <param name="configuration_file" value="/home/matteo/catkin_ws/src/artslam_laser_3d/configs/KITTI_long.json"/>
+     <remap from="/imu_data" to="$(arg imu_topic)" />
+     <param name="configuration_file" value="/home/matteo/catkin_ws/src/artslam_laser_3d/configs/KITTI_short.json"/>
      <param name="results_path" value="/home/matteo/results/"/>
    </node>
+
+   <node type="rviz" name="rviz" pkg="rviz" args="-d $(find artslam_laser_3d_wrapper)/rviz/basic_visualization.rviz" />
 </launch>

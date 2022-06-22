@@ -49,10 +49,18 @@
 #include "information_matrix_calculator.h"
 #include "loop_detector.h"
 #include "visualizer_bridge.h"
+#include "graph_handler.h"
 #include <backend_handler.h>
 #include <configuration_parser.cpp>
 #include <backend_handler.cpp>
 #include <artslam_laser_3d_wrapper/OfflineSLAM.h>
+#include <graph_handler.h>
+
+#include <sensor_msgs/Imu.h>
+#include <sensor_msgs/NavSatFix.h>
+#include <geographic_msgs/GeoPointStamped.h>
+#include <tf_conversions/tf_eigen.h>
+#include <tf/transform_listener.h>
 
 namespace artslam::laser3d {
     class ArtslamLaserWrapper : public nodelet::Nodelet {
@@ -78,7 +86,9 @@ namespace artslam::laser3d {
             private_nh.getParam("value", value_);
             pub = private_nh.advertise<std_msgs::Float64>("out", 10);
             map_pub = mt_nh.advertise<sensor_msgs::PointCloud2>("/hdl_graph_slam/map_points", 1, true);
-            sub = mt_nh.subscribe("/velodyne_points", 64, &ArtslamLaserWrapper::cloud_callback, this);
+            cloud_sub_ = mt_nh.subscribe("/velodyne_points", 64, &ArtslamLaserWrapper::cloud_callback, this);
+            imu_sub_ = mt_nh.subscribe("/imu_data", 1024, &ArtslamLaserWrapper::imu_callback, this);
+            gnss_sub_ = mt_nh.subscribe("/gnss_data", 1024, &ArtslamLaserWrapper::gnss_callback, this);
             service_ = private_nh.advertiseService("OfflineSLAM", &ArtslamLaserWrapper::offline_slam, this);
 
             private_nh.getParam("configuration_file", config_file_);
@@ -131,6 +141,8 @@ namespace artslam::laser3d {
 
         bool offline_slam(artslam_laser_3d_wrapper::OfflineSLAM::Request &req,
                           artslam_laser_3d_wrapper::OfflineSLAM::Request &res) {
+            backend_handler_->save_results(results_path_);
+            return true;
             std::vector<std::string> slam_paths = parse_slam_paths(config_file_);
 
             std::vector<std::string> pointclouds_filepaths;
@@ -192,16 +204,69 @@ namespace artslam::laser3d {
 
             pcl::PointCloud<Point3I>::Ptr cloud(new pcl::PointCloud<Point3I>());
             pcl::fromROSMsg(*cloud_msg, *cloud);
+            cloud->header.seq = count_;
+            count_++;
 
             // TODO check if header timestamp is in mus or ns
+            cloud->header.stamp *= 1000;
             prefilterer_->update_raw_pointcloud_observer(cloud);
+        }
+
+        void imu_callback(const sensor_msgs::ImuPtr& imu_msg) {
+            const auto& imu_orientation = imu_msg->orientation;
+            const auto& imu_acceleration = imu_msg->linear_acceleration;
+
+            geometry_msgs::Vector3Stamped acc_imu;
+            geometry_msgs::Vector3Stamped acc_base;
+            geometry_msgs::QuaternionStamped quat_imu;
+            geometry_msgs::QuaternionStamped quat_base;
+
+            quat_imu.header.frame_id = acc_imu.header.frame_id = imu_msg->header.frame_id;
+            quat_imu.header.stamp = acc_imu.header.stamp = ros::Time(0);
+            acc_imu.vector = imu_msg->linear_acceleration;
+            quat_imu.quaternion = imu_msg->orientation;
+
+            try {
+                tf_listener_.transformVector("base_link", acc_imu, acc_base);
+                tf_listener_.transformQuaternion("base_link", quat_imu, quat_base);
+            } catch(std::exception& e) {
+                std::cerr << "failed to find transform!!" << std::endl;
+                return;
+            }
+
+            IMU3D_MSG::Ptr conv_imu_msg(new IMU3D_MSG);
+            conv_imu_msg->header_.timestamp_ = imu_msg->header.stamp.toNSec();
+            conv_imu_msg->header_.frame_id_ = "base_link";
+            tf::Stamped<tf::Quaternion> quat;
+            tf::quaternionStampedMsgToTF(quat_base, quat);
+            tf::quaternionTFToEigen(quat, conv_imu_msg->orientation_);
+            tf::Stamped<tf::Vector3> acc;
+            tf::vector3StampedMsgToTF(acc_base, acc);
+            tf::vectorTFToEigen(acc, conv_imu_msg->linear_acceleration_);
+
+            //prefilterer_->update_raw_imu_observer(conv_imu_msg);
+            backend_handler_->update_raw_imu_observer(conv_imu_msg);
+        }
+
+        void gnss_callback(const sensor_msgs::NavSatFixConstPtr& navsat_msg) {
+            geographic_msgs::GeoPointStampedPtr gps_msg(new geographic_msgs::GeoPointStamped());
+            gps_msg->header = navsat_msg->header;
+            gps_msg->position.latitude = navsat_msg->latitude;
+            gps_msg->position.longitude = navsat_msg->longitude;
+            gps_msg->position.altitude = navsat_msg->altitude;
+
+            // TODO ADD TO SYSTEM
         }
 
         ros::NodeHandle mt_nh;
         ros::NodeHandle private_nh;
         ros::Publisher pub, map_pub;
-        ros::Subscriber sub;
+        ros::Subscriber cloud_sub_;
+        ros::Subscriber imu_sub_;
+        ros::Subscriber gnss_sub_;
+        tf::TransformListener tf_listener_;
         double value_;
+        int count_ = 0;
         ros::ServiceServer service_;
 
         // SLAM building blocks

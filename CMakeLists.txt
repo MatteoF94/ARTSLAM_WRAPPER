@@ -7,7 +7,7 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 # set the default path for built libraries to the "lib" directory of the project
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++17 -fopenmp")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++17 -fopenmp -DBOOST_LOG_DYN_LINK")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 ## Find catkin macros and libraries
@@ -27,6 +27,9 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   std_msgs
   message_generation
+  tf
+  tf_conversions
+  eigen_conversions
 )
 
 find_package(Boost REQUIRED COMPONENTS program_options log log_setup) # header only libraries must not be added here
