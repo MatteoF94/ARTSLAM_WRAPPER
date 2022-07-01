@@ -2,14 +2,14 @@
 <launch>
   <!-- arguments -->
   <arg name="nodelet_manager" default="velodyne_nodelet_manager" />
-  <arg name="points_topic" default="/os_cloud_node/points" />
-  <arg name="imu_topic" default="nothing" />
+  <arg name="points_topic" default="/points_topic" />
+  <arg name="imu_topic" default="/imu_topic" />
 
   <!-- transformation between lidar and base_link -->
   <node pkg="tf2_ros" type="static_transform_publisher" name="odom2map_publisher" args="0 0 0 0 0 0 1 map odom" />
   <node pkg="tf2_ros" type="static_transform_publisher" name="base2odom_publisher" args="0 0 0 0 0 0 1 odom base_link" />
-  <node pkg="tf2_ros" type="static_transform_publisher" name="lidar2base_publisher" args="0 0 0 0 0 0 1 base_link os_sensor" />
-<!--   <node pkg="tf" type="static_transform_publisher" name="imu2base_publisher" args="0 0 0 0 0 0 base_link os_imu 1000" /> -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="lidar2base_publisher" args="0 0 0 0 0 0 1 base_link lase_frame" />
+<!--   <node pkg="tf" type="static_transform_publisher" name="imu2base_publisher" args="0 0 0 0 0 0 base_link imu_frame 1000" /> -->
 
   <!-- in case you use velodyne_driver, comment out the following line -->
   <node pkg="nodelet" type="nodelet" name="$(arg nodelet_manager)" args="manager" output="screen"/>
@@ -18,8 +18,8 @@
    <node pkg="nodelet" type="nodelet" name="artslam_laser_3d_nodelet" args="load artslam_laser_3d_wrapper/ArtslamLaserWrapper $(arg nodelet_manager)">
      <remap from="/velodyne_points" to="$(arg points_topic)" />
      <remap from="/imu_data" to="$(arg imu_topic)" />
-     <param name="configuration_file" value="/home/gianluca/catkin_wss/bag_ws/src/artslam_config_and_output/config.json"/>
-     <param name="results_path" value="/home/gianluca/catkin_wss/bag_ws/src/artslam_config_and_output/"/>
+     <param name="configuration_file" value="config.json"/>
+     <param name="results_path" value="results/"/>
    </node>
 
    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find artslam_laser_3d_wrapper)/rviz/basic_visualization.rviz" />
