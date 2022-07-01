@@ -69,13 +69,12 @@ generate_messages(
 )
 
 catkin_package(
-  INCLUDE_DIRS src include
+  INCLUDE_DIRS src 
   LIBRARIES artslam_laser_3d_wrapper
   CATKIN_DEPENDS artslam_core ndt_omp fast_gicp nodelet artslam_laser_3d
 )
 
 include_directories(
-  include
   ${catkin_INCLUDE_DIRS}
   ${PROJECT_SOURCE_DIR}/src
 )
