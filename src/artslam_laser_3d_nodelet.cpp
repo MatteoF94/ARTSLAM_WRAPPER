@@ -31,8 +31,10 @@
 #include <nodelet/nodelet.h>
 #include <ros/ros.h>
 #include <std_msgs/Float64.h>
-#include <stdio.h>
+#include <cstdio>
 #include <prefilterer.h>
+#include <iostream>
+#include <fstream>
 
 #include <filesystem>
 #include <execution>
@@ -93,6 +95,8 @@ namespace artslam::laser3d {
 
             private_nh.getParam("configuration_file", config_file_);
             private_nh.getParam("results_path", results_path_);
+
+            _outfile.open(results_path_+"/timestamps.txt", std::ios::out);
 
             // prefilterer
             Prefilterer::Configuration prefilterer_configuration = artslam::laser3d::parse_prefilterer_configuration(config_file_);
@@ -205,11 +209,12 @@ namespace artslam::laser3d {
             pcl::PointCloud<Point3I>::Ptr cloud(new pcl::PointCloud<Point3I>());
             pcl::fromROSMsg(*cloud_msg, *cloud);
             cloud->header.seq = count_;
-            count_++;
 
-            // TODO check if header timestamp is in mus or ns
-            cloud->header.stamp *= 1000;
+            cloud->header.stamp = cloud_msg->header.stamp.toNSec();
             prefilterer_->update_raw_pointcloud_observer(cloud);
+
+            _outfile<<cloud->header.stamp<<" "<<count_<<std::endl;
+            count_++;
         }
 
         void imu_callback(const sensor_msgs::ImuPtr& imu_msg) {
@@ -229,8 +234,9 @@ namespace artslam::laser3d {
             try {
                 tf_listener_.transformVector("base_link", acc_imu, acc_base);
                 tf_listener_.transformQuaternion("base_link", quat_imu, quat_base);
-            } catch(std::exception& e) {
-                std::cerr << "failed to find transform!!" << std::endl;
+            }
+            catch (tf::TransformException ex) {
+                std::cerr << ex.what() << std::endl;
                 return;
             }
 
@@ -268,6 +274,8 @@ namespace artslam::laser3d {
         double value_;
         int count_ = 0;
         ros::ServiceServer service_;
+        std::ofstream _outfile;
+
 
         // SLAM building blocks
         std::shared_ptr<Prefilterer> prefilterer_;
